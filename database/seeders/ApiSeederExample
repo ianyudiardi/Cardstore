@@ -1,0 +1,103 @@
+// contoh seeder pake API
+
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Attribute;
+use App\Models\Card;
+use App\Models\CardFrame;
+use App\Models\MonsterType;
+use App\Models\SpellType;
+use App\Models\TrapType;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Http;
+
+class CardSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // Cards to import
+        $cardNames = [
+            'Blue-Eyes White Dragon',
+            'Dark Magician',
+            'Summoned Skull',
+            'Black Luster Soldier',
+            'Stardust Dragon',
+            'Number 39: Utopia',
+            'Decode Talker',
+            'Odd-Eyes Pendulum Dragon',
+            'Monster Reborn',
+            'Mirror Force',
+        ];
+
+        // Lookup maps
+        $attributeMap = Attribute::pluck('id', 'name')->toArray();
+        $monsterTypeMap = MonsterType::pluck('id', 'name')->toArray();
+        $frameMap = CardFrame::pluck('id', 'name')->toArray();
+        $spellTypeMap = SpellType::pluck('id', 'name')->toArray();
+        $trapTypeMap = TrapType::pluck('id', 'name')->toArray();
+
+        foreach ($cardNames as $name) {
+
+            $card = Http::get(
+                'https://db.ygoprodeck.com/api/v7/cardinfo.php',
+                [
+                    'name' => $name
+                ]
+            )->collect('data')->first();
+
+            if (!$card) {
+                $this->command?->warn("Could not find {$name}");
+                continue;
+            }
+
+            Card::updateOrCreate(
+
+                [
+                    'name' => $card['name']
+                ],
+
+                [
+                    'image' => $card['card_images'][0]['image_url'],
+
+                    'set' => $card['card_sets'][0]['set_code'] ?? '',
+
+                    'attribute_id' => isset($card['attribute'])
+                        ? ($attributeMap[$card['attribute']] ?? null)
+                        : null,
+
+                    'monster_type_id' => $monsterTypeMap[$card['race']] ?? null,
+
+                    'frame_id' => $frameMap[$card['type']] ?? null,
+
+                    'spell_type_id' => $spellTypeMap[$card['type']] ?? null,
+
+                    'trap_type_id' => $trapTypeMap[$card['type']] ?? null,
+
+                    'level' => $card['level'] ?? null,
+
+                    'rank' => $card['rank'] ?? null,
+
+                    'link_rating' => $card['linkval'] ?? null,
+
+                    'pendulum_scale' => $card['scale'] ?? null,
+
+                    'atk' => $card['atk'] ?? null,
+
+                    'def' => $card['def'] ?? null,
+
+                    'description' => $card['desc'],
+
+                    'rarity' => $card['card_sets'][0]['set_rarity'] ?? 'Common',
+
+                    'quantity' => rand(1, 10),
+
+                    'price' => rand(25000, 250000),
+                ]
+            );
+
+            $this->command?->info("Imported {$card['name']}");
+        }
+    }
+}
